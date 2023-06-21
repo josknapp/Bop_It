@@ -1,0 +1,96 @@
+import machine
+import utime
+import random
+
+# Button setup
+button = machine.Pin(12, machine.Pin.IN, machine.Pin.PULL_DOWN)
+button_state = 0
+# Rotary encoder setup
+class RotaryEncoder:
+    def __init__(self, pin_a, pin_b):
+        self.pin_a = machine.Pin(pin_a, machine.Pin.IN, machine.Pin.PULL_DOWN)
+        self.pin_b = machine.Pin(pin_b, machine.Pin.IN, machine.Pin.PULL_DOWN)
+        self.prev_state = self.pin_a.value()
+        self.position = 0
+
+    def attach_interrupts(self):
+        self.pin_a.irq(trigger=machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING, handler=self.encoder_handler)
+        self.pin_b.irq(trigger=machine.Pin.IRQ_RISING | machine.Pin.IRQ_FALLING, handler=self.encoder_handler)
+
+    def encoder_handler(self):
+        curr_state = self.pin_a.value()
+
+        if self.prev_state == curr_state:
+            self.position += 1
+        elif curr_state != self.prev_state:
+            self.position = 0  # Reset the value to zero
+        # Update the previous state
+        self.prev_state = curr_state
+
+encoder = RotaryEncoder(14, 15)
+encoder.attach_interrupts()
+
+# Flip switch setup
+switch = machine.Pin(16, machine.Pin.IN, machine.Pin.PULL_DOWN)
+switch_state = 0
+
+# Game commands
+command = ['bopit', 'twistit', 'pullit']
+
+# Function to check button state
+def check_button():
+    global button_state
+    button_state_prev = button_state
+    button_state = button.value()
+    if button_state == 1 and button_state_prev == 0:  # Rising edge detection
+        return True
+    else:
+        return False
+
+# Function to check switch state
+def check_switch():
+    global switch_state
+    switch_state_prev = switch_state
+    switch_state = switch.value()
+    if switch_state != switch_state_prev:  # State change detection
+        return True
+    else:
+        return False
+def check_command():
+    b = check_button()
+    p = check_switch()
+    encoder.encoder_handler()
+    pressed_button = ''
+    if b:
+        pressed_button = 'bopit'
+    elif p:
+        pressed_button = 'pullit'
+    elif encoder.position == 0:
+        pressed_button = 'twistit'
+    return pressed_button
+
+# Function to play a game round
+def play_round(command):
+    utime.sleep(1.75)
+    pressed_button = check_command()
+    if pressed_button == command:
+        return True
+    else:
+        return False
+
+# Main game loop
+score = 0
+
+utime.sleep(20)
+while True:
+    command = random.choice(command)
+    print(command)
+    if not play_round(command):
+        print("Wrong! Game Over")
+        print("Score:", score)
+        break
+    else:
+        print("Correct!")
+        score += 1
+    utime.sleep(1)
+
